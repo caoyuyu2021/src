@@ -5,6 +5,7 @@
 - [GITHUB上传文件方法教程](https://blog.csdn.net/weixin_44161567/article/details/120064658)
 - [GitHub如何删除项目库Repositories](https://www.likecs.com/show-203647457.html)
 - [解决git@github.com: Permission denied (publickey)](https://blog.csdn.net/qq_40047019/article/details/122898308)
+
 解决方案：
 - 情形一：
 
