@@ -24,4 +24,5 @@
 - eval `ssh-agent -s`
 - ssh-add ~/.ssh/github_id_rsa
 - ssh -T git@github.com
+出现下述表述则表示正确：
 Hi caoyuyu2021! You've successfully authenticated, but GitHub does not provide shell access.
