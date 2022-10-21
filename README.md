@@ -21,7 +21,7 @@
 - ssh-add ~/.ssh/github_id_rsa
 
 如果还是报错，则继续执行下述操作：
-- eval `ssh-agent -s`
+- eval \`ssh-agent -s\`
 - ssh-add ~/.ssh/github_id_rsa
 - ssh -T git@github.com
 出现下述表述则表示正确：
