@@ -32,5 +32,5 @@ Hi caoyuyu2021! You've successfully authenticated, but GitHub does not provide s
 选择对应的文件夹，Git Bash Here：  
 git init  
 git commit -m "first commit"  
-git remote add origin git@github.com:caoyuyu2021/example.git  
+git remote add origin git@github.com:caoyuyu2021/仓库名.git  
 git push -u origin master
