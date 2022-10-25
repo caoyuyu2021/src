@@ -1,4 +1,4 @@
-# src
+# 实用汇总
 
 参考链接：
 - [【实用工具】怎样快速访问Github？](https://blog.csdn.net/weixin_41512747/article/details/125941762?utm_medium=distribute.pc_feed_404.none-task-blog-2~default~BlogCommendFromBaidu~Rate-4-125941762-blog-null.pc_404_mixedpudn&depth_1-utm_source=distribute.pc_feed_404.none-task-blog-2~default~BlogCommendFromBaidu~Rate-4-125941762-blog-null.pc_404_mixedpud)
@@ -26,3 +26,11 @@
 - ssh -T git@github.com
 出现下述表述则表示正确：
 Hi caoyuyu2021! You've successfully authenticated, but GitHub does not provide shell access.
+
+
+# 切换文件夹提交
+选择对应的文件夹，Git Bash Here：  
+git init  
+git commit -m "first commit"  
+git remote add origin git@github.com:caoyuyu2021/example.git  
+git push -u origin master
