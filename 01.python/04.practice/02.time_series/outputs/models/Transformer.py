@@ -256,16 +256,16 @@ class Decoder(nn.Module):
         return x
     
     
-# 自编码类
-class TriangularCausalMask():
-    def __init__(self, B, L, device="cpu"):
-        mask_shape = [B, 1, L, L]
-        with torch.no_grad():
-            self._mask = torch.triu(torch.ones(mask_shape, dtype=torch.bool), diagonal=1).to(device)
+# # 自编码类
+# class TriangularCausalMask():
+#     def __init__(self, B, L, device="cpu"):
+#         mask_shape = [B, 1, L, L]
+#         with torch.no_grad():
+#             self._mask = torch.triu(torch.ones(mask_shape, dtype=torch.bool), diagonal=1).to(device)
 
-    @property
-    def mask(self):
-        return self._mask
+#     @property
+#     def mask(self):
+#         return self._mask
     
     
 class FullAttention(nn.Module):
@@ -284,10 +284,11 @@ class FullAttention(nn.Module):
         scores = torch.einsum("blhe,bshe->bhls", queries, keys)
 
         if self.mask_flag:
-            if attn_mask is None:
-                attn_mask = TriangularCausalMask(B, L, device=queries.device)
+            # if attn_mask is None:
+            #     attn_mask = TriangularCausalMask(B, L, device=queries.device)
 
-            scores.masked_fill_(attn_mask.mask, -np.inf)
+            # scores.masked_fill_(attn_mask.mask, -np.inf)
+            scores.masked_fill_(attn_mask, -np.inf)
 
         A = self.dropout(torch.softmax(scale * scores, dim=-1))
         V = torch.einsum("bhls,bshd->blhd", A, values)
@@ -389,13 +390,13 @@ class Transformer(nn.Module):
             projection=nn.Linear(d_model, c_out, bias=True)
         )
 
-    def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec):
+    def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec, attn_mask):
         # Embedding
         enc_out = self.enc_embedding(x_enc, x_mark_enc)
-        enc_out, attns = self.encoder(enc_out, attn_mask=None)
+        enc_out, attns = self.encoder(enc_out, attn_mask=attn_mask)
 
         dec_out = self.dec_embedding(x_dec, x_mark_dec)
-        dec_out = self.decoder(dec_out, enc_out, x_mask=None, cross_mask=None)
+        dec_out = self.decoder(dec_out, enc_out, x_mask=attn_mask, cross_mask=attn_mask)
         
         output = dec_out[:, -self.pred_len:, :]  # [B, L, D]
         return output
