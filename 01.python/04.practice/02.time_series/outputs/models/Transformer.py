@@ -256,16 +256,16 @@ class Decoder(nn.Module):
         return x
     
     
-# # 自编码类
-# class TriangularCausalMask():
-#     def __init__(self, B, L, device="cpu"):
-#         mask_shape = [B, 1, L, L]
-#         with torch.no_grad():
-#             self._mask = torch.triu(torch.ones(mask_shape, dtype=torch.bool), diagonal=1).to(device)
+# 自编码类
+class TriangularCausalMask():
+    def __init__(self, B, L, device="cpu"):
+        mask_shape = [B, 1, L, L]
+        with torch.no_grad():
+            self._mask = torch.triu(torch.ones(mask_shape, dtype=torch.float), diagonal=1).to(device)
 
-#     @property
-#     def mask(self):
-#         return self._mask
+    @property
+    def mask(self):
+        return self._mask
     
     
 class FullAttention(nn.Module):
@@ -284,11 +284,10 @@ class FullAttention(nn.Module):
         scores = torch.einsum("blhe,bshe->bhls", queries, keys)
 
         if self.mask_flag:
-            # if attn_mask is None:
-            #     attn_mask = TriangularCausalMask(B, L, device=queries.device)
+            if attn_mask is None:
+                attn_mask = TriangularCausalMask(B, L, device=queries.device)
 
-            # scores.masked_fill_(attn_mask.mask, -np.inf)
-            scores.masked_fill_(attn_mask, -np.inf)
+            scores.masked_fill_(attn_mask.mask.byte(), -float('inf'))
 
         A = self.dropout(torch.softmax(scale * scores, dim=-1))
         V = torch.einsum("bhls,bshd->blhd", A, values)
@@ -344,7 +343,7 @@ class Transformer(nn.Module):
             t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly], 
             you can also use more detailed freq like 15min or 3h'
     """
-    def __init__(self, pred_len, label_len, output_attention, enc_in, d_model, dropout, factor, n_heads, d_ff, 
+    def __init__(self, seq_len, pred_len, label_len, output_attention, enc_in, d_model, dropout, factor, n_heads, d_ff, 
                 e_layers, dec_in, d_layers, c_out, embed, freq):
         super(Transformer, self).__init__()
         self.pred_len = pred_len
@@ -390,13 +389,13 @@ class Transformer(nn.Module):
             projection=nn.Linear(d_model, c_out, bias=True)
         )
 
-    def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec, attn_mask):
+    def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec):
         # Embedding
         enc_out = self.enc_embedding(x_enc, x_mark_enc)
-        enc_out, attns = self.encoder(enc_out, attn_mask=attn_mask)
+        enc_out, attns = self.encoder(enc_out, attn_mask=None)
 
         dec_out = self.dec_embedding(x_dec, x_mark_dec)
-        dec_out = self.decoder(dec_out, enc_out, x_mask=attn_mask, cross_mask=attn_mask)
+        dec_out = self.decoder(dec_out, enc_out, x_mask=None, cross_mask=None)
         
         output = dec_out[:, -self.pred_len:, :]  # [B, L, D]
         return output
