@@ -1519,12 +1519,16 @@ def output(x_in: DataFrame,
         x_warning = __warning(x_warning, 10, 8)
     x_prediction = pd.DataFrame(data=x_out.loc[:, x_cols].values,
                                 columns=x_cols_prediction)
-    # print(x_prediction.columns)
+    
     # 合并输出
+    # if time_col != None:
+    #     x_out = pd.concat([x_time, x_in, x_prediction, x_warning], axis=1)
+    # else:
+    #     x_out = pd.concat([x_in, x_prediction, x_warning], axis=1)
     if time_col != None:
-        x_out = pd.concat([x_time, x_in, x_prediction, x_warning], axis=1)
+        x_out = pd.concat([x_time, x_in, x_prediction], axis=1)
     else:
-        x_out = pd.concat([x_in, x_prediction, x_warning], axis=1)
+        x_out = pd.concat([x_in, x_prediction], axis=1)
     print('合并输出为：{0}'.format(x_out))
 
     return x_out
@@ -1587,8 +1591,12 @@ def compute(
     freq = options['freq']
     embed = 'timeF'
     model_name = options['model_name']
-    d_model = 512
+    d_model = options['d_model']
+    patience = options['patience']
+    d_layers = options['d_layers']
+    e_layers = options['e_layers']
     time_col = options['time_col']
+    label_len = options['label_len']
     target = [i for i in options['target'] if i != time_col]
     is_plotting = options['is_plotting']
     is_real_time_warning = options['is_real_time_warning']
@@ -1597,8 +1605,11 @@ def compute(
     if type(device) == list:
         device = device[0]
     device = 'cuda' if device == 'gpu' else 'cpu'
-    jump_len = options['jump_len'] # 跳过离当前点最近的时间步，选择更前面的点去预测当前点
-    pred_len = options['pred_len'] # 预测时间步
+    jump_len = options['jump_len']
+    pred_len = options['pred_len'] 
+    task_name = options['task_name']
+    n_heads = options['n_heads']
+    dropout = options['dropout']
 
     # 训练模型
     if is_modelling:
@@ -1632,7 +1643,7 @@ def compute(
         params2 = {
             "seq_len": seq_len,
             "pred_len": pred_len,
-            "label_len": int(seq_len/2),
+            "label_len": label_len,
             "jump_len": jump_len,
             "batch_size": batch_size,
         }
@@ -1654,7 +1665,7 @@ def compute(
                 "n_epochs": n_epochs,
                 "learning_rate": learning_rate,
                 "loss": nn.MSELoss(),
-                "patience": max(1, int(n_epochs/3)),
+                "patience": patience,
                 "lradj": 'cosine',
                 "model_path": model_name,
                 "device": device,
@@ -1662,17 +1673,17 @@ def compute(
                 "plots": False,
             },
             "model_args": {
-                'task_name': 'short_term_forecast',
+                'task_name': task_name,
                 'seq_len': seq_len,
-                'label_len': int(seq_len/2),
+                'label_len': label_len,
                 'pred_len': pred_len,
                 'output_attention': True,
                 'distil': True,
                 'd_model': d_model,
-                'n_heads': 8,
-                'd_layers': 2,
-                'dropout': 0.1,
-                'e_layers': 2,
+                'n_heads': n_heads,
+                'd_layers': d_layers,
+                'dropout': dropout,
+                'e_layers': e_layers,
                 'enc_in': len(columns),
                 'dec_in': len(target),
                 'c_out': len(target),
@@ -1717,17 +1728,17 @@ def compute(
                 'jump_len': jump_len,
             },
             "model_args": {
-                'task_name': 'short_term_forecast',
+                'task_name': task_name,
                 'seq_len': seq_len,
-                'label_len': int(seq_len/2),
+                'label_len': label_len,
                 'pred_len': pred_len,
                 'output_attention': True,
                 'distil': True,
                 'd_model': d_model,
-                'n_heads': 8,
-                'd_layers': 2,
-                'dropout': 0.1,
-                'e_layers': 2,
+                'n_heads': n_heads,
+                'd_layers': d_layers,
+                'dropout': dropout,
+                'e_layers': e_layers,
                 'enc_in': len(columns),
                 'dec_in': len(target),
                 'c_out': len(target),
@@ -1793,17 +1804,17 @@ def compute(
                 'jump_len': jump_len,
             },
             "model_args": {
-                'task_name': 'short_term_forecast',
+                'task_name': task_name,
                 'seq_len': seq_len,
-                'label_len': int(seq_len/2),
+                'label_len': label_len,
                 'pred_len': pred_len,
                 'output_attention': True,
                 'distil': True,
                 'd_model': d_model,
-                'n_heads': 8,
-                'd_layers': 2,
-                'dropout': 0.1,
-                'e_layers': 2,
+                'n_heads': n_heads,
+                'd_layers': d_layers,
+                'dropout': dropout,
+                'e_layers': e_layers,
                 'enc_in': len(columns),
                 'dec_in': len(target),
                 'c_out': len(target),
@@ -1844,7 +1855,6 @@ if __name__ == '__main__':
     train_data = pd.read_csv("../data/energy.csv").iloc[:-300, :]
     # 预测数据
     test_data = pd.read_csv("../data/energy.csv").iloc[-300:, :]
-    # y_test_data = pd.read_csv("../data/energy.csv").iloc[-300:, [0, 2]]
 
     # 训练
     param1 = {
@@ -1854,13 +1864,21 @@ if __name__ == '__main__':
             'is_modelling': True,
             'batch_size': 32,
             'seq_len': 6,
-            'jump_len': 3,
+            'jump_len': 0,
             'pred_len': 1,
+            'label_len': 2,
+            'd_layers': 2,
+            'e_layers': 2,
+            'n_heads': 8, 
             'learning_rate': 0.001,
             'model_name': 'Informer',
             'device': 'gpu',
             'freq': 's',
-            'n_epochs': 100,
+            'n_epochs': 5,
+            'patience': 3,
+            'd_model': 512,
+            'dropout': 0.1,
+            'task_name': 'short_term_forecast',
             'time_col': 'time',
             'target': ['load', 'temp'],
             'is_plotting': True,
@@ -1879,13 +1897,21 @@ if __name__ == '__main__':
             'is_modelling': False,
             'batch_size': 32,
             'seq_len': 6,
-            'jump_len': 3,
+            'jump_len': 0,
             'pred_len': 1,
+            'label_len': 2,
+            'd_layers': 2,
+            'e_layers': 2,
+            'n_heads': 8, 
             'learning_rate': 0.001,
             'model_name': 'Informer',
             'device': 'gpu',
             'freq': 's',
-            'n_epochs': 100,
+            'n_epochs': 5,
+            'patience': 3,
+            'd_model': 512,
+            'dropout': 0.1,
+            'task_name': 'short_term_forecast',
             'time_col': 'time',
             'target': ['load', 'temp'],
             'is_plotting': True,
