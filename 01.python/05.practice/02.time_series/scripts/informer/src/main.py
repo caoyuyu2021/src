@@ -1559,6 +1559,14 @@ def compute(
         跳过的序列长度，跳过离当前点最近的时间步，选择更前面的点去预测当前点，正整数
     pred_len : {int}
         目标应该在未来多少个时间步之后，正整数
+    label_len : {int}
+        先验时间步，正整数
+    dropout : {float}
+        网络丢失率
+    task_name : {str}
+        预测任务，可为'short_term_forecast'或'long_term_forecast'
+    n_heads : {int}
+        注意力头数，正整数
     learning_rate : {float}
         深度学习训练的学习率,默认为0.001
     freq : {str}
