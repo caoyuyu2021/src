@@ -64,16 +64,40 @@ def loader(data_path=None, data=None, time_col=None, datetime=None, freq=None):
     # 时间列处理
     if time_col == None:
         # 筛选输入频率
-        re_ = re.findall('[0-9]', freq)
-        if len(re_) == 0:
+        re_1 = re.findall('[0-9]', freq)
+        re_2 = re.findall('[a-z]', freq)
+        # 识别数字频率
+        if len(re_1) == 0:
             nums = 1
         else:
-            nums = int(''.join(re_))
+            nums = int(''.join(re_1))
+        # 识别频率
+        fr = re_2[0]
         # 生成时间间隔
-        time_index = pd.date_range(start=pd.to_datetime(datetime),
-                                   end=pd.to_datetime(datetime) +
-                                   timedelta(seconds=(data.shape[0] - 1)*nums),
-                                   freq=freq)
+        if fr == 's':
+            time_index = pd.date_range(start=pd.to_datetime(datetime),
+                                       end=pd.to_datetime(datetime) +
+                                       timedelta(
+                                           seconds=(data.shape[0] - 1)*nums),
+                                       freq=freq)
+        elif fr == 't':
+            time_index = pd.date_range(start=pd.to_datetime(datetime),
+                                       end=pd.to_datetime(datetime) +
+                                       timedelta(
+                                           minutes=(data.shape[0] - 1)*nums),
+                                       freq=freq)
+        elif fr == 'h':
+            time_index = pd.date_range(start=pd.to_datetime(datetime),
+                                       end=pd.to_datetime(datetime) +
+                                       timedelta(
+                                           hours=(data.shape[0] - 1)*nums),
+                                       freq=freq)
+        elif fr == 'd':
+            time_index = pd.date_range(start=pd.to_datetime(datetime),
+                                       end=pd.to_datetime(datetime) +
+                                       timedelta(
+                                           days=(data.shape[0] - 1)*nums),
+                                       freq=freq)
         full_data = pd.DataFrame(data=data.values,
                                  index=pd.to_datetime(time_index, unit=freq),
                                  columns=data.columns)
@@ -224,8 +248,6 @@ def divider(df, train_ratio, valid_ratio, x_feature_list, y_feature_list, freq):
         目标特征列，不包含时间列
     freq : {str}
         用来编码时间特征的频率，可选[s:秒,t:分,h:时,d:天,b:工作日,w:周,m:月]，频率越低，模型可能越精确
-    scaler_path : {str} 
-        数据归一化模型保存地址
 
     返回值
     -------
@@ -246,12 +268,10 @@ def divider(df, train_ratio, valid_ratio, x_feature_list, y_feature_list, freq):
     x_scaler = x_scaler.fit(df.copy()[x_feature_list])
     y_scaler = y_scaler.fit(df.copy()[y_feature_list])
 
-    # 保存归一化参数
+    # 设置保存归一化参数路径
     model_outputs = {}
     model_outputs["x_scaler"] = x_scaler
     model_outputs["y_scaler"] = y_scaler
-    # joblib.dump(x_scaler, "x_scaler")
-    # joblib.dump(y_scaler, "y_scaler")
 
     # 测试集
     train = df.copy().iloc[:int(df.shape[0]*train_ratio), :][x_feature_list]
@@ -262,8 +282,7 @@ def divider(df, train_ratio, valid_ratio, x_feature_list, y_feature_list, freq):
     ytr = df.copy().iloc[:int(df.shape[0]*train_ratio), :][y_feature_list]
     ytr[y_feature_list] = y_scaler.transform(ytr)
     ytr = ytr.values.astype('float32')
-    train = [pd.DataFrame(xtr, columns=x_feature_list), pd.DataFrame(
-        ytr, columns=y_feature_list), pd.DataFrame(train_stamp)]
+    train = [xtr, ytr, train_stamp]
 
     # 验证集
     if train_ratio != 1:
@@ -277,10 +296,9 @@ def divider(df, train_ratio, valid_ratio, x_feature_list, y_feature_list, freq):
                       : int(df.shape[0]*(train_ratio+valid_ratio)), :][y_feature_list]
         yva[y_feature_list] = y_scaler.transform(yva)
         yva = yva.values.astype('float32')
-        valid = [pd.DataFrame(xva, columns=x_feature_list), pd.DataFrame(
-            yva, columns=y_feature_list), pd.DataFrame(valid_stamp)]
+        valid = [xva, yva, valid_stamp]
     else:
-        valid = [pd.DataFrame(0), pd.DataFrame(0), pd.DataFrame(0)]
+        valid = [np.array(0), np.array(0), np.array(0)]
 
     # 测试集
     if train_ratio + valid_ratio != 1:
@@ -294,16 +312,14 @@ def divider(df, train_ratio, valid_ratio, x_feature_list, y_feature_list, freq):
             df.shape[0]*(train_ratio+valid_ratio)):, :][y_feature_list]
         yte[y_feature_list] = y_scaler.transform(yte)
         yte = yte.values.astype('float32')
-        test = [pd.DataFrame(xte, columns=x_feature_list), pd.DataFrame(
-            yte, columns=y_feature_list), pd.DataFrame(test_stamp)]
+        test = [xte, yte, test_stamp]
     else:
-        test = [pd.DataFrame(0), pd.DataFrame(0), pd.DataFrame(0)]
+        test = [np.array(0), np.array(0), np.array(0)]
 
     return x_scaler, y_scaler, train, valid, test, model_outputs
 
-
-# 在做单步预测时，减缓预测滞后问题（不使用离当前点最近的前几个点，选择更前面的点去预测当前点）
-def generator(data_list, seq_len, pred_len, label_len, jump_len, batch_size, sample_freq: int = 1):
+# 利用前seq_len个数据，预测下pred_len个数据
+def generator(data_list, seq_len, pred_len, label_len, batch_size, sample_freq: int = 1):
     """
     读取数据，并对数据进行划分
 
@@ -317,8 +333,6 @@ def generator(data_list, seq_len, pred_len, label_len, jump_len, batch_size, sam
         目标应该在未来多少个时间步之后，正整数
     label_len : {int} 
         先验时间步
-    jump_len : {int} 
-        跳过离当前点最近的前几个点，选择更前面的点去预测当前点
     batch_size : {int} 
         输入数据的批次大小，正整数
     sample_freq : {int} 
@@ -340,23 +354,31 @@ def generator(data_list, seq_len, pred_len, label_len, jump_len, batch_size, sam
     # 获取数据
     feature = data_list[0]  # 特征
     target = data_list[1]  # 目标
-    stamp = data_list[2]  # 时间戳
+    stamp = data_list[2]  # 时间戳，不包含未来的时间
 
     # 循环生成数据
     X, y = [], []
     X_stamp, y_stamp = [], []
-    seq_len = seq_len - 1  # 包含当前时间点
-    for i in range(seq_len+jump_len, len(feature) - pred_len, sample_freq):
+
+    for index in range(0, len(feature) - seq_len - pred_len + 1, sample_freq):
+        # 起点
+        s_begin = index
+        # 终点(起点 + 回视窗口)
+        s_end = s_begin + seq_len
+        # (终点 - 先验序列窗口)
+        r_begin = s_end - label_len
+        # (终点 + 预测序列长度)
+        r_end = r_begin + label_len + pred_len
+
         # 数据维度
-        feat = feature[i - seq_len-jump_len:i + 1-jump_len]
-        tar = target[i + 1:i + 1 + pred_len]
+        feat = feature[s_begin: s_end]
+        tar = target[r_begin: r_end]
         X.append(np.array(feat))
         y.append(np.array(tar))
 
         # 时间维度
-        xs = stamp[i - seq_len-jump_len:i + 1-jump_len]
-        ys = pd.concat([stamp[i + 1 - label_len-jump_len:i +
-                       1 - jump_len], stamp[i + 1:i + 1 + pred_len]])
+        xs = stamp[s_begin: s_end]
+        ys = stamp[r_begin: r_end]
         X_stamp.append(np.array(xs))
         y_stamp.append(np.array(ys))
 
@@ -369,9 +391,8 @@ def generator(data_list, seq_len, pred_len, label_len, jump_len, batch_size, sam
     y_stamp = torch.as_tensor(y_stamp).float()
 
     # 创建dataloader，[特征，目标，特征时间编码，目标时间编码]
-    data_loader = DataLoader(TensorDataset(X, y, X_stamp, y_stamp),
-                             shuffle=True,
-                             batch_size=batch_size)
+    data_loader = DataLoader(TensorDataset(
+        X, y, X_stamp, y_stamp), shuffle=True, batch_size=batch_size)
 
     return X, y, X_stamp, y_stamp, data_loader
 
@@ -901,11 +922,9 @@ class Informer(nn.Module):
         return None
 
 
-def train(task_args, train_args, model_args):
+def train(train_args, model_args):
     # 参数配置
-    columns = task_args['columns']  # 模型全部特征
-    target = task_args['target']  # 模型预测特征
-    features = task_args['features']  # 模型预测模式
+    features = train_args['features']  # 模型预测模式
     model_name = train_args['model_name']  # 模型名称
     train_loader = train_args['train_loader']  # 训练集
     valid_loader = train_args['valid_loader']  # 验证集
@@ -915,14 +934,14 @@ def train(task_args, train_args, model_args):
     patience = train_args['patience']  # 最大早停次数阈值，超过就会早停
     lradj = train_args['lradj']  # 学习率函数
     model_path = train_args['model_path']  # 模型保存路径
-    model_outputs = train_args['model_outputs']
     verbose = train_args['verbose']  # 打印训练过程
     plots = train_args['plots']  # 绘制损失图
     device = train_args['device']  # 训练设备，可选'cuda'和'cpu'
     pred_len = model_args['pred_len']  # 预测长度
     label_len = model_args['label_len']
+    model_outputs = train_args['model_outputs']
 
-    # 检查是否可用GPU
+    # 检查可用device
     device = torch.device(device)
 
     # 创建模型和优化器
@@ -981,38 +1000,10 @@ def train(task_args, train_args, model_args):
             if self.verbose:
                 print(
                     f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-            # torch.save(model.state_dict(), path)
             model_outputs['informer'] = model.state_dict()
             joblib.dump(model_outputs, path)
-
             self.val_loss_min = val_loss
     early_stopping = EarlyStopping(patience=patience, verbose=verbose)
-
-    # 训练任务
-    def forecasting_task(columns, target, features):
-        """
-        features: [M, S, MS]; 
-            M:multivariate predict multivariate, 
-            S:univariate predict univariate, 
-            MS:multivariate predict univariate'
-        """
-        # 字典索引生成
-        col_dict = {}
-        for i, j in enumerate(columns):
-            col_dict[j] = i
-
-        if features == 'MS':
-            target = target[0]
-            if target in columns:
-                f_dim = col_dict[target]
-            else:
-                f_dim = 0
-        elif features == 'S':
-            f_dim = 0
-        else:
-            f_dim = 0
-        return f_dim
-    f_dim = forecasting_task(columns, target, features)
 
     # 模型训练和验证
     train_losses, val_losses = [], []
@@ -1020,7 +1011,7 @@ def train(task_args, train_args, model_args):
         model.train()
         total_train_loss = 0
         for batch_x, batch_y, batch_x_mark, batch_y_mark in train_loader:
-            # 将数据移至 GPU
+            # 将数据移至 device
             batch_x = batch_x.to(device)  # 会用到实际数据
             batch_y = batch_y.to(device)  # 只用来获取维度，不会用到实际数据，防止泄露信息
             batch_x_mark = batch_x_mark.to(device)
@@ -1029,16 +1020,11 @@ def train(task_args, train_args, model_args):
             optimizer.zero_grad()
             # decoder输入
             dec_inp = torch.zeros_like(batch_y[:, -pred_len:, :]).float()
-            if features == 'MS':
-                dec_inp = torch.cat(
-                    [batch_x[:, -label_len:, f_dim: f_dim+1], dec_inp], dim=1).float().to(device)
-                outputs = model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-                outputs = outputs[:, :, f_dim: f_dim+1]
-            else:
-                dec_inp = torch.cat(
-                    [batch_x[:, -label_len:, f_dim:], dec_inp], dim=1).float().to(device)
-                outputs = model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-                outputs = outputs[:, :, f_dim:]
+            dec_inp = torch.cat([batch_y[:, :label_len, :], dec_inp], dim=1).float().to(device)
+            outputs = model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+            f_dim = -1 if features == 'MS' else 0
+            outputs = outputs[:, -pred_len:, f_dim:]
+            batch_y = batch_y[:, -pred_len:, f_dim:]
             train_loss = criterion(outputs, batch_y)
             # 反向传播计算得到每个参数的梯度值
             train_loss.backward()
@@ -1059,25 +1045,18 @@ def train(task_args, train_args, model_args):
         with torch.no_grad():
             total_val_loss = 0
             for batch_x, batch_y, batch_x_mark, batch_y_mark in valid_loader:
-                # 将数据移至 GPU
+                # 将数据移至 device
                 batch_x = batch_x.to(device)  # 会用到实际数据
                 batch_y = batch_y.to(device)  # 只用来获取维度，不会用到实际数据，防止泄露信息
                 batch_x_mark = batch_x_mark.to(device)
                 batch_y_mark = batch_y_mark.to(device)
                 # decoder输入
                 dec_inp = torch.zeros_like(batch_y[:, -pred_len:, :]).float()
-                if features == 'MS':
-                    dec_inp = torch.cat(
-                        [batch_x[:, -label_len:, f_dim: f_dim+1], dec_inp], dim=1).float().to(device)
-                    outputs = model(batch_x, batch_x_mark,
-                                    dec_inp, batch_y_mark)
-                    outputs = outputs[:, :, f_dim: f_dim+1]
-                else:
-                    dec_inp = torch.cat(
-                        [batch_x[:, -label_len:, f_dim:], dec_inp], dim=1).float().to(device)
-                    outputs = model(batch_x, batch_x_mark,
-                                    dec_inp, batch_y_mark)
-                    outputs = outputs[:, :, f_dim:]
+                dec_inp = torch.cat([batch_y[:, :label_len, :], dec_inp], dim=1).float().to(device)
+                outputs = model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                f_dim = -1 if features == 'MS' else 0
+                outputs = outputs[:, -pred_len:, f_dim:]
+                batch_y = batch_y[:, -pred_len:, f_dim:]
                 val_loss = criterion(outputs, batch_y)
                 # 每个batch的loss和
                 total_val_loss += val_loss.item()
@@ -1090,8 +1069,7 @@ def train(task_args, train_args, model_args):
 
         # 打印训练过程
         if verbose:
-            print(
-                f'Epoch [{epoch+1}/{n_epochs}], Training Loss: {avg_train_loss:.4f}, Validation Loss: {avg_val_loss:.4f}')
+            print(f'Epoch [{epoch+1}/{n_epochs}], Training Loss: {avg_train_loss:.4f}, Validation Loss: {avg_val_loss:.4f}')
 
         # 设置早停
         early_stopping(avg_val_loss, model, model_path)
@@ -1120,24 +1098,24 @@ def train(task_args, train_args, model_args):
 
     return model
 
-# 模型预测
-def predict(task_args, test_args, model_args):
+
+def predict(task_args, predict_args, model_args):
     # 参数配置
-    columns = task_args['columns']  # 全部
+    columns = task_args['columns']
     target = task_args['target']
     features = task_args['features']
-    model_name = test_args['model_name']
-    model_path = test_args['model_path']
-    x_true = test_args['x_true']
-    time_col = test_args['time_col']
-    freq = model_args['freq']
+    mode = task_args['mode'] # 可选'online'和'offline'
+    time_col = predict_args['time_col']
+    freq = predict_args['freq']
+    model_name = predict_args['model_name']
+    x_true = predict_args['x_true']
+    model_path = predict_args['model_path']
+    device = predict_args['device']  # 可选'cuda'和'cpu'
     pred_len = model_args['pred_len']
     label_len = model_args['label_len']
-    jump_len = test_args['jump_len']
     seq_len = model_args['seq_len']
-    device = test_args['device']  # 训练设备，可选'cuda'和'cpu'
 
-    # 检查是否可用GPU
+    # 检查可用device
     device = torch.device(device)
 
     # 读取归一化参数
@@ -1145,90 +1123,163 @@ def predict(task_args, test_args, model_args):
     x_scaler = model_outputs["x_scaler"]
     y_scaler = model_outputs["y_scaler"]
 
-    # 构造数据集
-    time_columns = x_true.index  # 获取时间列
-    x_true = x_true.copy()[columns]
-    stamp = time_features(pd.to_datetime(x_true.index), freq=freq)
-    stamp = stamp.transpose(1, 0)
-    x_true[columns] = x_scaler.transform(x_true)
-    x_true = x_true.values.astype('float32')
-    X_true, X_stamp, y_stamp = [], [], []
-    seq_len = seq_len - 1  # 包含当前时间点
-    for i in range(seq_len+jump_len, len(x_true) - pred_len):
-        feat = x_true[i - seq_len-jump_len: i + 1-jump_len]
-        X_true.append(np.array(feat))
-        xs = stamp[i - seq_len-jump_len: i + 1-jump_len]
-        ys = np.concatenate(
-            [stamp[i + 1 - label_len-jump_len:i + 1 - jump_len], stamp[i + 1:i + 1 + pred_len]])
-        X_stamp.append(np.array(xs))
-        y_stamp.append(np.array(ys))
-    X_true = torch.as_tensor(X_true).float()
-    X_stamp = torch.as_tensor(X_stamp).float()
-    y_stamp = torch.as_tensor(y_stamp).float()
-
     # 加载模型
     model = model_name(**model_args)
     state_dict = model_outputs['informer']
     model.load_state_dict(state_dict)
 
-    # 预测任务
-    def forecasting_task(columns, target, features):
-        """
-        features: [M, S, MS]; 
-            M:multivariate predict multivariate, 
-            S:univariate predict univariate, 
-            MS:multivariate predict univariate'
-        """
-        # 字典索引生成
-        col_dict = {}
-        for i, j in enumerate(columns):
-            col_dict[j] = i
-
-        if features == 'MS':
-            target = target[0]
-            if target in columns:
-                f_dim = col_dict[target]
-            else:
-                f_dim = 0
-        elif features == 'S':
-            f_dim = 0
+    # 预测模式
+    if mode == 'online':
+        # 生成固定长度的时间范围
+        x_true = loader(data_path=None, data=x_true, time_col=time_col)  # 原始数据
+        x_true = x_true[columns]
+        timedelta = x_true.index[-1] - x_true.index[-2]  # 时间差
+        if label_len != 0:
+            y_stamp = pd.date_range(start=x_true.index[-label_len],
+                                    end=x_true.index[-label_len] +
+                                    timedelta*(label_len+pred_len-1),
+                                    freq=freq)
         else:
-            f_dim = 0
-        return f_dim
-    f_dim = forecasting_task(columns, target, features)
-
-    # 模型预测
-    model.eval()
-    with torch.no_grad():
-        X_true = X_true.to(device)
-        X_stamp = X_stamp.to(device)
-        y_stamp = y_stamp.to(device)
-
-        # decoder输入
-        B, _, _ = X_true.shape
-        dec_inp = torch.zeros((B, pred_len, len(target))).float().to(device)
-        if features == 'MS':
-            dec_inp = torch.cat(
-                [X_true[:, -label_len:, f_dim: f_dim+1], dec_inp], dim=1).float().to(device)
-            y_pred = model(X_true, X_stamp, dec_inp, y_stamp)
-            y_pred = y_scaler.inverse_transform(
-                y_pred[:, -1, :])  # 输出最后一个预测值并反归一化
-            y_pred = y_pred[:, f_dim: f_dim+1]
-        else:
-            dec_inp = torch.cat(
-                [X_true[:, -label_len:, f_dim:], dec_inp], dim=1).float().to(device)
-            y_pred = model(X_true, X_stamp, dec_inp, y_stamp)
-            y_pred = y_scaler.inverse_transform(
-                y_pred[:, -1, :])  # 输出最后一个预测值并反归一化
-            y_pred = y_pred[:, f_dim:]
-
-        # 输出为Dataframe
-        print(y_pred.shape)
-        y = pd.DataFrame(data=None, columns=target, index=time_columns)
-        y.iloc[seq_len+1+jump_len:, :] = y_pred
-        y_pred = y.reset_index().rename(columns={'index': time_col})
+            y_stamp = pd.date_range(start=x_true.index[-1]+timedelta*(label_len+1),
+                                    end=x_true.index[-1] +
+                                    timedelta*(label_len+pred_len),
+                                    freq=freq)
+        x_stamp = time_features(pd.to_datetime(x_true.index), freq=freq)  # x时间戳数据
+        x_stamp = x_stamp.transpose(1, 0)
+        y_time = y_stamp
+        y_stamp = time_features(y_stamp, freq=freq)  # y时间戳数据
+        y_stamp = y_stamp.transpose(1, 0)
+    
+        # 转换类型
+        x_true[columns] = x_scaler.transform(x_true)  # 归一化
+        x_true = x_true.values.astype('float32')
+        x_true = torch.as_tensor(x_true).unsqueeze(0).float()  # 转为张量
+        x_stamp = torch.as_tensor(x_stamp).unsqueeze(0).float()
+        y_stamp = torch.as_tensor(y_stamp).unsqueeze(0).float()
+    
+        # 关闭自动求导功能
+        model.eval()  # 一定要有
+        with torch.no_grad():
+            x_true = x_true.to(device)
+            x_stamp = x_stamp.to(device)
+            y_stamp = y_stamp.to(device)
+            # decoder输入
+            B, _, _ = x_true.shape
+            dec_inp = torch.zeros((B, pred_len + label_len, len(target))).float().to(device) # 占位符
+            y_pred = model(x_true, x_stamp, dec_inp, y_stamp)
+            y_pred = y_pred.cpu().detach().numpy()
+            f_dim = -1 if features == 'MS' else 0
+            y_pred = y_pred[:, -pred_len:, f_dim:]
+            y_pred = y_scaler.inverse_transform(y_pred[-1, :, :])  # 反归一化
+    
+        # 输出为dataframe
+        y_pred = pd.DataFrame(
+            data=y_pred, index=y_time[-pred_len:], columns=target)
+    # 离线模式
+    else:
+        # 构造数据集
+        x_true_ = loader(data_path=None, data=x_true, time_col=time_col)  # 原始数据
+        time_columns = x_true_.index  # 获取时间列
+        x_true_ = x_true_.copy()[columns]
+    
+        # X时间编码
+        x_stamp = pd.to_datetime(x_true_.index)
+        x_stamp = time_features(x_stamp, freq=freq)
+        x_stamp = x_stamp.transpose(1, 0)
+    
+        # y时间编码，包含未来的时间
+        timedelta = x_true_.index[-1] - x_true_.index[-2]  # 时间差
+        y_stamp = pd.date_range(start=x_true_.index[0],
+                                end=x_true_.index[-1] +
+                                timedelta*(pred_len),
+                                freq=freq)
+        y_stamp = time_features(y_stamp, freq=freq)
+        y_stamp = y_stamp.transpose(1, 0)
+    
+        # X归一化
+        x_true_[columns] = x_scaler.transform(x_true_)
+        x_true_ = x_true_.values.astype('float32')
+    
+        # 生成预测张量
+        X_true, X_stamp, Y_stamp = [], [], []
+        sample_freq = 1
+        for index in range(0, len(x_true) - seq_len + 1, sample_freq):
+            # 起点
+            s_begin = index
+            # 终点(起点 + 回视窗口)
+            s_end = s_begin + seq_len
+            # (终点 - 先验序列窗口)
+            r_begin = s_end - label_len
+            # (终点 + 预测序列长度)
+            r_end = r_begin + label_len + pred_len
+    
+            # 数据维度
+            feat = x_true_[s_begin: s_end]
+            X_true.append(np.array(feat))
+    
+            # 时间维度
+            xs = x_stamp[s_begin: s_end]
+            ys = y_stamp[r_begin: r_end]
+            X_stamp.append(np.array(xs))
+            Y_stamp.append(np.array(ys))
+        X_true = torch.as_tensor(X_true).float()
+        X_stamp = torch.as_tensor(X_stamp).float()
+        Y_stamp = torch.as_tensor(Y_stamp).float()
+    
+        # 模型预测
+        model.eval()
+        with torch.no_grad():
+            X_true = X_true.to(device)
+            X_stamp = X_stamp.to(device)
+            Y_stamp = Y_stamp.to(device)
+    
+            # decoder输入
+            B, _, _ = X_true.shape
+            dec_inp = torch.zeros(
+                (B, pred_len + label_len, len(target))).float().to(device)
+            y_pred = model(X_true, X_stamp, dec_inp, Y_stamp)
+            y_pred = y_pred.cpu().detach().numpy()
+            f_dim = -1 if features == 'MS' else 0
+            y_pred = y_pred[:, -pred_len:, f_dim:]
+    
+        # y_pred的形状为 (batch_size, pred_len, feature_dim)
+        batch_size, pred_len, feature_dim = y_pred.shape
+        time_index = time_columns[seq_len-1:]
+    
+        # 初始化一个空的 DataFrame，每行是初始时间，每列是递增的预测步
+        # 列名格式为 target_i，例如 target_1 表示预测步1，target_2 表示预测步2，依此类推
+        columns = [f"{t}_{i+1}" for i in range(pred_len) for t in target]
+        result_df = pd.DataFrame(index=time_index, columns=columns)
+    
+        # 填充 DataFrame，每一行是一个时间点的预测序列
+        for i in range(batch_size):
+            # 当前时间点的预测
+            pred_data = y_scaler.inverse_transform(
+                y_pred[i, :, :])  # 形状 (pred_len, feature_dim)
+            pred_flattened = pred_data.flatten()  # 将预测结果展平
+    
+            # 将展平的预测步依次填入当前行
+            result_df.iloc[i] = pred_flattened
+    
+        # 将原始数据与预测数据合并输出
+        result_df = result_df.reset_index().rename(columns={'index': time_col})
+        select_columns = [time_col] + target
+        y_pred = pd.merge(x_true[select_columns], result_df, on=time_col, how='left')
 
     return y_pred
+
+# 获取最后一个预测结果
+def last_prediction(prediction, pred_len, time_col, target):
+    pre_target = [i+'_'+str(pred_len) for i in target]
+    prediction_target = prediction[pre_target]
+    time = prediction[[time_col]]
+    # 向下平移数据
+    prediction_shift = prediction_target.shift(pred_len)
+    prediction_shift.columns = target
+    # 对齐时间
+    last_prediction = pd.concat([time, prediction_shift], axis=1)
+    
+    return last_prediction
 
 
 # 计算评估指标
@@ -1521,14 +1572,14 @@ def output(x_in: DataFrame,
                                 columns=x_cols_prediction)
     
     # 合并输出
-    # if time_col != None:
-    #     x_out = pd.concat([x_time, x_in, x_prediction, x_warning], axis=1)
-    # else:
-    #     x_out = pd.concat([x_in, x_prediction, x_warning], axis=1)
     if time_col != None:
-        x_out = pd.concat([x_time, x_in, x_prediction], axis=1)
+        x_out = pd.concat([x_time, x_in, x_prediction, x_warning], axis=1)
     else:
-        x_out = pd.concat([x_in, x_prediction], axis=1)
+        x_out = pd.concat([x_in, x_prediction, x_warning], axis=1)
+    # if time_col != None:
+    #     x_out = pd.concat([x_time, x_in, x_prediction], axis=1)
+    # else:
+    #     x_out = pd.concat([x_in, x_prediction], axis=1)
     print('合并输出为：{0}'.format(x_out))
 
     return x_out
@@ -1613,7 +1664,6 @@ def compute(
     if type(device) == list:
         device = device[0]
     device = 'cuda' if device == 'gpu' else 'cpu'
-    jump_len = options['jump_len']
     pred_len = options['pred_len'] 
     task_name = options['task_name']
     n_heads = options['n_heads']
@@ -1631,7 +1681,7 @@ def compute(
                 columns = ts_data.columns
             else:
                 features = 'MS'
-                columns = [i for i in ts_data.columns if i != target[0]]
+                columns = [i for i in ts_data.columns if i != target[0]] # 不使用待预测点参与训练
         else:
             features = 'M'
             columns = ts_data.columns
@@ -1652,7 +1702,6 @@ def compute(
             "seq_len": seq_len,
             "pred_len": pred_len,
             "label_len": label_len,
-            "jump_len": jump_len,
             "batch_size": batch_size,
         }
         _, _, _, _, train_loader = generator(train_data, **params2)
@@ -1660,16 +1709,12 @@ def compute(
 
         # 模型训练
         params3 = {
-            "task_args": {
-                "columns": columns,
-                "target": target,
-                "features": features
-            },
             "train_args": {
+                "features": features,
                 "model_name": Informer,
-                "model_outputs": model_outputs,
                 "train_loader": train_loader,
                 "valid_loader": valid_loader,
+                "model_outputs": model_outputs,
                 "n_epochs": n_epochs,
                 "learning_rate": learning_rate,
                 "loss": nn.MSELoss(),
@@ -1678,7 +1723,7 @@ def compute(
                 "model_path": model_name,
                 "device": device,
                 "verbose": False,
-                "plots": False,
+                "plots": True,
             },
             "model_args": {
                 'task_name': task_name,
@@ -1697,7 +1742,7 @@ def compute(
                 'c_out': len(target),
                 'factor': 3,
                 'd_ff': d_model,
-                'embed': embed,
+                'embed': embed,  # 可选'timeF','fixed'
                 'freq': freq
             },
         }
@@ -1720,20 +1765,21 @@ def compute(
             features = 'M'
             columns = ts_data.columns
 
-        # 构造参数字典
+        # 模型预测
         params4 = {
             "task_args": {
                 "columns": columns,
                 "target": target,
-                "features": features
+                "features": features,
+                "mode": 'offline'
             },
-            "test_args": {
-                'model_name': Informer,
-                'model_path': model_name,
-                'time_col': time_col,
-                'x_true': ts_data,
-                'device': 'cpu',
-                'jump_len': jump_len,
+            "predict_args": {
+                "time_col": time_col,
+                "freq": freq,
+                "model_name": Informer,
+                "model_path": model_name,
+                "x_true": ts_data.reset_index().rename(columns={'index': time_col}),
+                "device": 'cpu'
             },
             "model_args": {
                 'task_name': task_name,
@@ -1752,11 +1798,21 @@ def compute(
                 'c_out': len(target),
                 'factor': 3,
                 'd_ff': d_model,
-                'embed': embed,
+                'embed': embed,  # 可选'timeF','fixed'
                 'freq': freq
             },
         }
         y_pred = predict(**params4)
+
+        # 输出选取
+        params5 = {
+            "prediction": y_pred,
+            "pred_len": pred_len,
+            "time_col": time_col,
+            "target": target
+        }
+        y_pred = last_prediction(**params5)
+
         x_in = ts_data[target]
         x_in[time_col] = ts_data.index
 
@@ -1769,14 +1825,14 @@ def compute(
                 raise ValueError('请选择需要绘制的点，不能为空！')
             # 曲线绘制
             ts_data[time_col] = ts_data.index
-            param2 = {
+            param6 = {
                 'x_in': ts_data,
                 'x_out': y_pred,
                 'time_col': time_col,
                 'plot_cols': plot_cols,
                 'threshold': options['threshold'],
             }
-            plot(**param2)
+            plot(**param6)
 
         return x_out
     else:
@@ -1791,25 +1847,25 @@ def compute(
             else:
                 features = 'MS'
                 columns = [i for i in ts_data.columns if i != target[0]]
-                # print(columns)
         else:
             features = 'M'
             columns = ts_data.columns
 
-        # 构造参数字典
-        params4 = {
+        # 模型预测
+        params7 = {
             "task_args": {
                 "columns": columns,
                 "target": target,
-                "features": features
+                "features": features,
+                "mode": 'offline'
             },
-            "test_args": {
-                'model_name': Informer,
-                'model_path': model_name,
-                'time_col': time_col,
-                'x_true': ts_data,
-                'device': 'cpu',
-                'jump_len': jump_len,
+            "predict_args": {
+                "time_col": time_col,
+                "freq": freq,
+                "model_name": Informer,
+                "model_path": model_name,
+                "x_true": ts_data.reset_index().rename(columns={'index': time_col}),
+                "device": 'cpu'
             },
             "model_args": {
                 'task_name': task_name,
@@ -1828,11 +1884,21 @@ def compute(
                 'c_out': len(target),
                 'factor': 3,
                 'd_ff': d_model,
-                'embed': embed,
+                'embed': embed,  # 可选'timeF','fixed'
                 'freq': freq
             },
         }
-        y_pred = predict(**params4)
+        y_pred = predict(**params7)
+
+        # 输出选取
+        params8 = {
+            "prediction": y_pred,
+            "pred_len": pred_len,
+            "time_col": time_col,
+            "target": target
+        }
+        y_pred = last_prediction(**params8)
+
         x_in = ts_data[target]
         x_in[time_col] = ts_data.index
 
@@ -1872,7 +1938,6 @@ if __name__ == '__main__':
             'is_modelling': True,
             'batch_size': 32,
             'seq_len': 6,
-            'jump_len': 0,
             'pred_len': 1,
             'label_len': 2,
             'd_layers': 2,
@@ -1881,18 +1946,18 @@ if __name__ == '__main__':
             'learning_rate': 0.001,
             'model_name': 'Informer',
             'device': 'gpu',
-            'freq': 's',
+            'freq': 'h',
             'n_epochs': 5,
             'patience': 3,
             'd_model': 512,
             'dropout': 0.1,
             'task_name': 'short_term_forecast',
             'time_col': 'time',
-            'target': ['load', 'temp'],
+            'target': ['temp'],
             'is_plotting': True,
-            'plot_cols': ['load', 'temp'],
+            'plot_cols': ['temp'],
             'threshold': 0.05,
-            'is_real_time_warning': False
+            'is_real_time_warning': True
         }
     }
     model = compute(**param1)
@@ -1905,7 +1970,6 @@ if __name__ == '__main__':
             'is_modelling': False,
             'batch_size': 32,
             'seq_len': 6,
-            'jump_len': 0,
             'pred_len': 1,
             'label_len': 2,
             'd_layers': 2,
@@ -1914,18 +1978,18 @@ if __name__ == '__main__':
             'learning_rate': 0.001,
             'model_name': 'Informer',
             'device': 'gpu',
-            'freq': 's',
+            'freq': 'h',
             'n_epochs': 5,
             'patience': 3,
             'd_model': 512,
             'dropout': 0.1,
             'task_name': 'short_term_forecast',
             'time_col': 'time',
-            'target': ['load', 'temp'],
+            'target': ['temp'],
             'is_plotting': True,
-            'plot_cols': ['load', 'temp'],
+            'plot_cols': ['temp'],
             'threshold': 0.05,
-            'is_real_time_warning': False
+            'is_real_time_warning': True
         }
     }
     y_pred = compute(**param2)
