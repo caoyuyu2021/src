@@ -1000,7 +1000,7 @@ def train(train_args, model_args):
             if self.verbose:
                 print(
                     f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-            model_outputs['informer'] = model.state_dict()
+            model_outputs['caoyuyu'] = model.state_dict()
             joblib.dump(model_outputs, path)
             self.val_loss_min = val_loss
     early_stopping = EarlyStopping(patience=patience, verbose=verbose)
@@ -1125,7 +1125,7 @@ def predict(task_args, predict_args, model_args):
 
     # 加载模型
     model = model_name(**model_args)
-    state_dict = model_outputs['informer']
+    state_dict = model_outputs['caoyuyu']
     model.load_state_dict(state_dict)
 
     # 预测模式
@@ -1648,7 +1648,7 @@ def compute(
     seq_len = options['seq_len']
     learning_rate = options['learning_rate']
     freq = options['freq']
-    embed = 'timeF'
+    embed = options['embed']
     model_name = options['model_name']
     d_model = options['d_model']
     patience = options['patience']
@@ -1945,8 +1945,9 @@ if __name__ == '__main__':
             'n_heads': 8, 
             'learning_rate': 0.001,
             'model_name': 'Informer',
-            'device': 'gpu',
+            'device': 'cpu',
             'freq': 'h',
+            'embed': 'timeF',
             'n_epochs': 5,
             'patience': 3,
             'd_model': 512,
@@ -1977,8 +1978,9 @@ if __name__ == '__main__':
             'n_heads': 8, 
             'learning_rate': 0.001,
             'model_name': 'Informer',
-            'device': 'gpu',
+            'device': 'cpu',
             'freq': 'h',
+            'embed': 'timeF',
             'n_epochs': 5,
             'patience': 3,
             'd_model': 512,
