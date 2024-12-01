@@ -1,2 +1,0 @@
-
-from .encoder import Encoder
