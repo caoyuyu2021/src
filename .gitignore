@@ -1,3 +1,4 @@
 .ipynb_checkpoints/
 __pycache__
 pre_trained_models/
+ner_models/
