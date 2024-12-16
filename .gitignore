@@ -2,3 +2,4 @@
 __pycache__
 pre_trained_models/
 ner_models/
+checkpoint.pth
