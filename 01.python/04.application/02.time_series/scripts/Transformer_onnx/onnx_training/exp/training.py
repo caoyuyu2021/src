@@ -1,4 +1,4 @@
-import init_env
+from init_env import init_path
 import pandas as pd
 import torch.nn as nn
 from models.Transformer import Transformer
@@ -12,7 +12,7 @@ warnings.filterwarnings("ignore")
 
 if __name__ == '__main__':
     # 数据加载
-    ts_data = pd.read_csv("data/energy.csv")
+    ts_data = pd.read_csv(init_path() + "data/energy.csv")
     ts_data = loader(data_path=None, data=ts_data, time_col='time')
 
     # 数据集划分
@@ -23,7 +23,7 @@ if __name__ == '__main__':
         "x_feature_list": ['load', 'temp'],
         "y_feature_list": ['load', 'temp'],
         "freq": 'h',
-        "scaler_path": 'outputs/scalers/Transformer'
+        "scaler_path": init_path() + 'outputs/scalers/Transformer'
     }
     x_scaler, y_scaler, train_data, valid_data, test_data = divider(**params1)
 
@@ -50,12 +50,12 @@ if __name__ == '__main__':
             "model_name": Transformer,
             "train_loader": train_loader,
             "valid_loader": valid_loader,
-            "n_epochs": 50,
+            "n_epochs": 20,
             "learning_rate": 0.001,
             "loss": nn.MSELoss(),
-            "patience": 10,
+            "patience": 3,
             "lradj": 'cosine',
-            "model_path": "outputs/best_models/Transformer",
+            "model_path": init_path() + "outputs/best_models/Transformer",
             "device": 'cuda',
             "verbose": True,
             "plots": True,

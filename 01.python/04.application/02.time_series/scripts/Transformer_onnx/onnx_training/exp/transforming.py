@@ -1,4 +1,4 @@
-import init_env
+from init_env import init_path
 from models.Transformer import Transformer
 from utils.transform import transform
 import warnings
@@ -13,8 +13,8 @@ if __name__ == '__main__':
             "seq_len": 6,
             "mask_size": 4,
             "model_name": Transformer,
-            "model_path": "outputs/best_models/Transformer/checkpoint.pth",
-            "export_onnx_path": 'outputs/best_models/Transformer/transformer.onnx',
+            "model_path": init_path() + "outputs/best_models/Transformer/checkpoint.pth",
+            "export_onnx_path": init_path() + 'outputs/best_models/Transformer/transformer.onnx',
         },
         "model_args": {
             'seq_len': 6,
