@@ -1,4 +1,6 @@
-# 添加项目目录到python环境
-import sys
+# 获取项目路径
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
+
+def init_path():
+    path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../')) + "/"
+    return path
