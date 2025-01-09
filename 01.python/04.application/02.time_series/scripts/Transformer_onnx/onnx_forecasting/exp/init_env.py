@@ -4,5 +4,5 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
 def init_path():
-    path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../')) + "/"
+    path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../')) + '/'
     return path

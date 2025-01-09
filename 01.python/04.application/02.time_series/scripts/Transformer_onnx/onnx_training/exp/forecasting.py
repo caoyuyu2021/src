@@ -20,7 +20,7 @@ if __name__ == '__main__':
             "model_path":
             init_path() + "outputs/best_models/Transformer/transformer.onnx",
             "x_true": ts_data,
-            "scaler_path": init_path() + 'outputs/scalers/Transformer',
+            "scaler_path": init_path() + "outputs/scalers/Transformer",
             'pred_len': 1,
             "label_len": 3,
         },

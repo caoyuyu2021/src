@@ -23,7 +23,7 @@ if __name__ == '__main__':
         "x_feature_list": ['load', 'temp'],
         "y_feature_list": ['load', 'temp'],
         "freq": 'h',
-        "scaler_path": init_path() + 'outputs/scalers/Transformer'
+        "scaler_path": init_path() + "outputs/scalers/Transformer"
     }
     x_scaler, y_scaler, train_data, valid_data, test_data = divider(**params1)
 

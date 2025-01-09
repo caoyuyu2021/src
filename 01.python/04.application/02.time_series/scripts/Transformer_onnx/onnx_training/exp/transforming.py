@@ -14,7 +14,7 @@ if __name__ == '__main__':
             "mask_size": 4,
             "model_name": Transformer,
             "model_path": init_path() + "outputs/best_models/Transformer/checkpoint.pth",
-            "export_onnx_path": init_path() + 'outputs/best_models/Transformer/transformer.onnx',
+            "export_onnx_path": init_path() + "outputs/best_models/Transformer/transformer.onnx",
         },
         "model_args": {
             'seq_len': 6,
