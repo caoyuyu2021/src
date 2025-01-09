@@ -1,3 +1,4 @@
+import init_env
 import pandas as pd
 import torch.nn as nn
 from models.Transformer import Transformer
@@ -11,7 +12,7 @@ warnings.filterwarnings("ignore")
 
 if __name__ == '__main__':
     # 数据加载
-    ts_data = pd.read_csv("../data/energy.csv")
+    ts_data = pd.read_csv("data/energy.csv")
     ts_data = loader(data_path=None, data=ts_data, time_col='time')
 
     # 数据集划分
@@ -20,9 +21,9 @@ if __name__ == '__main__':
         "train_ratio": 0.8,
         "valid_ratio": 0.1,
         "x_feature_list": ['load', 'temp'],
-        "y_feature_list": ['temp'],
+        "y_feature_list": ['load', 'temp'],
         "freq": 'h',
-        "scaler_path": '../outputs/scalers/Transformer'
+        "scaler_path": 'outputs/scalers/Transformer'
     }
     x_scaler, y_scaler, train_data, valid_data, test_data = divider(**params1)
 
@@ -45,17 +46,17 @@ if __name__ == '__main__':
     # 模型训练
     params3 = {
         "train_args": {
-            "features": 'MS',
+            "features": 'M',
             "model_name": Transformer,
             "train_loader": train_loader,
             "valid_loader": valid_loader,
-            "n_epochs": 20,
+            "n_epochs": 50,
             "learning_rate": 0.001,
             "loss": nn.MSELoss(),
-            "patience": 3,
+            "patience": 10,
             "lradj": 'cosine',
-            "model_path": "../outputs/best_models/Transformer",
-            "device": 'cpu',
+            "model_path": "outputs/best_models/Transformer",
+            "device": 'cuda',
             "verbose": True,
             "plots": True,
         },
@@ -66,16 +67,16 @@ if __name__ == '__main__':
             'output_attention': True,
             'embed': 'timeF', 
             'freq': 'h',
-            'd_model': 256,
+            'd_model': 512,
             'enc_in': 2,
-            'dec_in': 1,
+            'dec_in': 2,
             'dropout': 0.1,
             'factor': 3,
             'n_heads': 8,
-            'd_ff': 128,
-            'e_layers': 1,
-            'd_layers': 1,
-            'c_out': 1
+            'd_ff': 256,
+            'e_layers': 2,
+            'd_layers': 2,
+            'c_out': 2
         },
     }
     model = train(**params3)

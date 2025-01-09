@@ -1,3 +1,4 @@
+import init_env
 from models.Transformer import Transformer
 from utils.transform import transform
 import warnings
@@ -12,8 +13,8 @@ if __name__ == '__main__':
             "seq_len": 6,
             "mask_size": 4,
             "model_name": Transformer,
-            "model_path": "../outputs/best_models/Transformer/checkpoint.pth",
-            "export_onnx_path": '../outputs/best_models/Transformer/transformer.onnx',
+            "model_path": "outputs/best_models/Transformer/checkpoint.pth",
+            "export_onnx_path": 'outputs/best_models/Transformer/transformer.onnx',
         },
         "model_args": {
             'seq_len': 6,
@@ -22,16 +23,16 @@ if __name__ == '__main__':
             'output_attention': True,
             'embed': 'timeF', 
             'freq': 'h',
-            'd_model': 256,
+            'd_model': 512,
             'enc_in': 2,
-            'dec_in': 1,
+            'dec_in': 2,
             'dropout': 0.1,
             'factor': 3,
             'n_heads': 8,
-            'd_ff': 128,
-            'e_layers': 1,
-            'd_layers': 1,
-            'c_out': 1
+            'd_ff': 256,
+            'e_layers': 2,
+            'd_layers': 2,
+            'c_out': 2
         },
     }
     transform(**params)
