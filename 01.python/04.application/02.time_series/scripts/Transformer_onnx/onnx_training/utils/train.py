@@ -87,7 +87,8 @@ def train(train_args, model_args):
             if self.verbose:
                 print(
                     f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-            torch.save(model.state_dict(), path + '/' + 'checkpoint.pth')
+            with open(path + '/' + 'checkpoint.pth', 'wb') as f:
+                torch.save(model.state_dict(), f)
             self.val_loss_min = val_loss
     early_stopping = EarlyStopping(patience=patience, verbose=verbose)
 

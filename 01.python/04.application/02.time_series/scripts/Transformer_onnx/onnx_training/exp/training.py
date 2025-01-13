@@ -6,6 +6,7 @@ from utils.loader import loader
 from utils.divider import divider
 from utils.generator import generator
 from utils.train import train
+from utils.test import test
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -38,6 +39,8 @@ if __name__ == '__main__':
         train_data, **params2)
     X_valid, y_valid, X_valid_stamp, y_valid_stamp, valid_loader = generator(
         valid_data, **params2)
+    X_test, y_test, X_test_stamp, y_test_stamp, test_loader = generator(
+        test_data, **params2)
     print("X_size: {0}, y_size: {1}, X_train_stamp: {2}, loader_len: {3}".format(
     X_train.shape, y_train.shape, X_train_stamp.shape, len(train_loader)))
     print("X_size: {0}, y_size: {1}, X_valid_stamp: {2}, loader_len: {3}".format(
@@ -81,3 +84,21 @@ if __name__ == '__main__':
     }
     model = train(**params3)
     print('模型训练完成！')
+
+    # 模型测试
+    params4 = {
+        "test_args": {
+            "features": 'M',
+            "model": model,
+            "x_test": X_test,
+            "x_test_stamp": X_test_stamp,
+            "y_test": y_test,
+            "y_test_stamp": y_test_stamp,
+            'drawing_pred': 0,
+            'label_len': 3,
+            'pred_len': 1,
+            'device': 'cuda',
+            'test_path': init_path() + "outputs/results/Transformer"
+        }
+    }
+    res = test(**params4)
