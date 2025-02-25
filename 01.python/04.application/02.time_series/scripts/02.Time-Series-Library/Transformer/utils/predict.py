@@ -149,7 +149,6 @@ def predict(task_args, predict_args, model_args):
     pred_len = model_args['pred_len']
     label_len = model_args['label_len']
     seq_len = model_args['seq_len']
-    x_true.to_excel('../data/班竹变断路器SF6气体密度输入数据表.xlsx')
 
     # 检查可用device
     device = torch.device(device)
