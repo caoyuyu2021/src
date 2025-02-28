@@ -7,7 +7,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 if __name__ == '__main__':
-    ts_data = pd.read_csv(init_path() + "data/energy.csv").iloc[-300:, ]
+    ts_data = pd.read_csv(init_path() + "data/energy.csv").iloc[-300:, :]
     ts_data['time'] = pd.to_datetime(ts_data['time'])
     # 构造参数字典
     params = {
